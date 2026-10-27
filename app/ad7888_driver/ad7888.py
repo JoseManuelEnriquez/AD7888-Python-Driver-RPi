@@ -1,11 +1,11 @@
 import spidev 
-from parameters import NORMAL_MODE, SHUTDOWN_MODE, AUTO_SHUTDOWN_MODE, STANDBY_MODE 
+from parameters import *
 
 FREQUENCY = 500_000 
 
 class AD7888:   
 
-    def __init__(self, spi_bus, device_cs, channel=0, ref=0, mode=NORMAL_MODE):
+    def __init__(self, spi_bus, device_cs, channel=AIN1, ref=0, mode=NORMAL_MODE):
         self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, device_cs)
         self.spi.max_speed_hz = FREQUENCY
