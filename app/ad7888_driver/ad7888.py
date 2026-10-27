@@ -1,18 +1,20 @@
 import spidev 
-import NORMAL_MODE, SHUTDOWN_MODE, AUTO_SHUTDOWN_MODE, STANDBY_MODE from parameters
+from parameters import NORMAL_MODE, SHUTDOWN_MODE, AUTO_SHUTDOWN_MODE, STANDBY_MODE 
 
-FREQUENCY = 500000
-PERIOD_US = 1.0 / FREQUENCY  
-BYTE_PER_WORD = 16
+FREQUENCY = 500_000 
 
-class AD7888:
+class AD7888:   
 
-    def __init__(self, spi_bus, device_cs):
-        self.spi = spidev.Spidev()
+    def __init__(self, spi_bus, device_cs, channel=0, ref=0, mode=NORMAL_MODE):
+        self.spi = spidev.SpiDev()
         self.spi.open(spi_bus, device_cs)
-        self.spi.max_speed_hz(FREQUENCY)
-        self.spi.mode = 0
+        self.spi.max_speed_hz = FREQUENCY
+        self.spi.mode = 0b11
         self.spi.bits_per_word = 8
+
+        self.set_channel(channel)
+        self.set_reference(ref)
+        self.set_power_mode(mode)
 
     def set_channel(self, channel):
         self.channel = channel
@@ -21,23 +23,27 @@ class AD7888:
         self.ref= reference
 
     def set_power_mode(self, mode):
-        if(mode == NORMAL_MODE):
-            self.read_cb = self._send_normal_mode
-        elif(mode == SHUTDOWN_MODE):
-            self.read_cb = self._send_shutdown_mode
-        elif(mode == AUTO_SHUTDOWN_MODE):
-            self.read_cb = self._send_auto_shutdown_mode
-        elif(mode == STANDBY_MODE):
-            self.read_cb = self._send_standby_mode
-            
+        handlers = {
+            NORMAL_MODE: self._send_normal_mode,
+            SHUTDOWN_MODE: self._send_shutdown_mode,
+            AUTO_SHUTDOWN_MODE: self._send_auto_shutdown_mode,
+            STANDBY_MODE: self._send_standby_mode,
+        }
+        if mode not in handlers:
+            raise ValueError(f"Modo de energía no válido: {mode}")
+        self.mode = mode              # bits PM1/PM0
+        self.read_cb = handlers[mode]
+
+    
     def _send_shutdown_mode(self):
-        pass
+        raise NotImplementedError
 
     def _send_auto_shutdown_mode(self):
-        pass
+        raise NotImplementedError
 
     def _send_standby_mode(self):
-        pass
+        raise NotImplementedError
+        
     
     def _send_normal_mode(self):
         '''
@@ -49,10 +55,15 @@ class AD7888:
  
         ANOTACION: Se debe mantener los bits de PM1 y PM0 para que funcione
         '''
-        data_byte = [(0x00 | (self.channel << 3) | (self.ref << 2) | (self.mode)), (0x00 | (self.mode))]
-        data_rx = self.spi.xfer2(data_byte)
-        return (data_rx >> 4) # Se desplaza 4 posiciones porque el ADC agrega 4 ceros primero
+        # 16 ciclos de SCLK en una sola trama (CS bajo durante los 2 bytes).
+        ctrl = (self.channel << 3) | (self.ref << 2) | self.mode
+        rx = self.spi.xfer2([ctrl, ctrl])
+        # Trama de salida: 4 ceros + 12 bits de datos
+        return ((rx[0] & 0x0F) << 8) | rx[1]
 
     def read_data(self):
-        self.read_cb()
+        return self.read_cb()
+
+    def close(self):
+        self.spi.close()
 
