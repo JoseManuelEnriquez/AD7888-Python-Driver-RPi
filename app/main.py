@@ -18,7 +18,7 @@ def feed(buf, volt):
 
 def update_voltages(adc, buf):
     volt = read_adc(adc)
-    feed(buf,volt)
+    feed(buf, volt)
 
 def calculate_percetange(adc, buf):
     volt = (sum(buf) / len(buf))
@@ -26,7 +26,7 @@ def calculate_percetange(adc, buf):
 
 blink = False
 
-def blinking(percentage, led_thread):
+def led_blinking(percentage, led_thread):
     if percentage <= 0.33:
         led_thread.start()
         blink = True
@@ -49,7 +49,7 @@ def main():
     while True:
         update_voltages(adc, buf)
         percentage = calculate_percetange(adc, buf)
-        blinking(percentage, led_thread)
+        led_blinking(percentage, led_thread)
         sleep(10)
 
 if __name__ == "__main__":
